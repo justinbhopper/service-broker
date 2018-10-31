@@ -1,0 +1,5 @@
+- Message size test:
+	- Haven't written this because I don't feel we can get away with syncing only using the data that came from the row that was written
+	- ^ this means we will likely need to go to an API to grab data anyways, which makes it pointless to store extra data
+- Async handlers:
+	- We can handle each message before continuing the loop or we can spawn tasks that run async while the loop continues
