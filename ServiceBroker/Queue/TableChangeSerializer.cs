@@ -8,8 +8,16 @@ namespace ServiceBroker
 {
     public class TableChangeSerializer
     {
-        private readonly JsonSerializer _jsonSerializer = JsonSerializer.CreateDefault();
-        
+        private readonly JsonSerializer _jsonSerializer;
+
+        public TableChangeSerializer()
+            : this(JsonSerializer.CreateDefault()) { }
+
+        public TableChangeSerializer(JsonSerializer jsonSerializer)
+        {
+            _jsonSerializer = jsonSerializer;
+        }
+
         public IEnumerable<TableChange> Deserialize(byte[] message, Encoding encoding)
         {
             IList<TableChangeMessage> changeMessages;
@@ -19,6 +27,21 @@ namespace ServiceBroker
                 changeMessages = _jsonSerializer.Deserialize(reader, typeof(IList<TableChangeMessage>)) as IList<TableChangeMessage>;
             }
 
+            // Don't bother with unnecessary overhead if just one message
+            if (changeMessages.Count == 1)
+            {
+                var changeMessage = changeMessages[0];
+                return new[]
+                {
+                    new TableChange(changeMessage.TableName)
+                    {
+                        InsertedOrUpdated = changeMessage.InsertedOrUpdated?.Select(i => i.Id).ToList(),
+                        Deleted = changeMessage.Deleted?.Select(i => i.Id).ToList()
+                    }
+                };
+            }
+
+            // Multiple messages, so we must merge the ones with the same table name
             var changes = new Dictionary<string, TableChange>();
             foreach (var changeMessage in changeMessages)
             {
@@ -39,10 +62,10 @@ namespace ServiceBroker
                 }
 
                 if (changeMessage.InsertedOrUpdated != null)
-                    tableChange.InsertedOrUpdated = changeMessage.InsertedOrUpdated.Select(i => i.Id).ToList();
+                    tableChange.InsertedOrUpdated.AddRange(changeMessage.InsertedOrUpdated.Select(i => i.Id));
 
                 if (changeMessage.Deleted != null)
-                    tableChange.Deleted = changeMessage.Deleted.Select(i => i.Id).ToList();
+                    tableChange.Deleted.AddRange(changeMessage.Deleted.Select(i => i.Id));
             }
 
             return changes.Values;

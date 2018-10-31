@@ -4,8 +4,8 @@ namespace ServiceBroker
 {
     public class TableChange
     {
-        private IList<int> _insertedOrUpdated;
-        private IList<int> _deleted;
+        private List<int> _insertedOrUpdated;
+        private List<int> _deleted;
 
         public TableChange(string tableName)
         {
@@ -14,13 +14,13 @@ namespace ServiceBroker
 
         public string TableName { get; set; }
 
-        public IList<int> InsertedOrUpdated
+        public List<int> InsertedOrUpdated
         {
             get => _insertedOrUpdated ?? (_insertedOrUpdated = new List<int>());
             set => _insertedOrUpdated = value;
         }
 
-        public IList<int> Deleted
+        public List<int> Deleted
         {
             get => _deleted ?? (_deleted = new List<int>());
             set => _deleted = value;
