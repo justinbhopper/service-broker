@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Data;
 using System.Data.SqlClient;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -21,30 +20,28 @@ namespace ServiceBroker
             _command = new CommandDefinition("dbo.spx_ReceiveSyncRequest", new { timeoutMs = 100 }, commandTimeout: 2, commandType: CommandType.StoredProcedure);
         }
         
-        public void Listen(CancellationToken cancellationToken = default(CancellationToken))
+        public void Listen(CancellationToken cancellationToken)
         {
-            Task.Factory.StartNew(async () => await LoopUntilAsync(cancellationToken), TaskCreationOptions.LongRunning);
+            Task.Factory.StartNew(async () => await LoopAsync(cancellationToken), TaskCreationOptions.LongRunning);
         }
         
-        private async Task LoopUntilAsync(CancellationToken cancellation)
+        private async Task LoopAsync(CancellationToken cancellation)
         {
             while (!cancellation.IsCancellationRequested)
             {
-                await CheckForMessagesAsync();
+                await CheckForMessageAsync();
             }
         }
 
-        private async Task CheckForMessagesAsync()
+        private async Task CheckForMessageAsync()
         {
             try
             {
-                var messages = await _sqlConnection.QueryAsync<Message>(_command);
-
-                int count = messages.Count();
-
-                if (count > 0)
+                var message = await _sqlConnection.QueryFirstAsync<Message>(_command);
+                
+                if (message != null)
                 {
-                    await _messageHandler.HandleAsync(messages);
+                    await _messageHandler.HandleAsync(message);
                 }
             }
             catch (Exception e)

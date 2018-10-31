@@ -34,7 +34,7 @@ namespace ServiceBroker
                 line = Console.CursorTop;
             }
 
-            using (var test = new AsyncProcessingTest(connectionString, connectionString, 15))
+            using (var test = new AsyncProcessingTest(connectionString, connectionString, 100, 5))
             {
                 test.UpdateStatistics += (s, stats) => OnUpdateStatistics(line, stats);
                 test.Finished += (s, e) =>

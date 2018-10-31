@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -15,15 +14,7 @@ namespace ServiceBroker
             _changeHandler = changeHandler;
         }
         
-        public async Task HandleAsync(IEnumerable<Message> messages)
-        {
-            foreach (var message in messages)
-            {
-                await HandleMessageAsync(message);
-            }
-        }
-
-        private async Task HandleMessageAsync(Message message)
+        public async Task HandleAsync(Message message)
         {
             var tableChanges = _serializer.Deserialize(message.Body, Encoding.Unicode);
 

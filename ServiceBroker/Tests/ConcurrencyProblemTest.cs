@@ -31,7 +31,8 @@ namespace ServiceBroker
                 var ids = new HashSet<int>();
                 var connection = new SqlConnection(receiveConnectionString);
                 var collector = new TableChangeIdCollector(ids);
-                var receiver = new MessageReceiver(connection, collector);
+                var messageHandler = new TableChangeQueueMessageHandler(collector);
+                var receiver = new MessageReceiver(connection, messageHandler);
 
                 collector.TableChanged += (s, e) => _checkIfFinished();
 

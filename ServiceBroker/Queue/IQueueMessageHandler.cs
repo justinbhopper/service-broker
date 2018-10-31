@@ -1,10 +1,9 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
 namespace ServiceBroker
 {
     public interface IQueueMessageHandler
     {
-        Task HandleAsync(IEnumerable<Message> messages);
+        Task HandleAsync(Message message);
     }
 }

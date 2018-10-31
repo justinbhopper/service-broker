@@ -10,21 +10,22 @@ namespace ServiceBroker
         private readonly PerformanceStats _stats;
         private readonly SqlConnection _receiveConnection;
         private readonly SqlConnection _sendConnection;
-        private readonly ITableChangeHandler _changeHandler;
         private readonly MockSynchronizer _synchronizer = new MockSynchronizer();
         private readonly PreTest _preTest;
 
-        public AsyncProcessingTest(string sendConnectionString, string receiveConnectionString, int numberOfMessages)
+        public AsyncProcessingTest(string sendConnectionString, string receiveConnectionString, int numberOfMessages, int maxParallelProcessing)
         {
             _sendConnection = new SqlConnection(sendConnectionString);
             _receiveConnection = new SqlConnection(receiveConnectionString);
 
             _preTest = new PreTest(_sendConnection);
 
-            _changeHandler = new TableChangeHandler(new MockSynchronizerMapper(_synchronizer));
+            var changeHandler = new TableChangeHandler(new MockSynchronizerMapper(_synchronizer));
+            var messageHandler = new TableChangeQueueMessageHandler(changeHandler);
+            var parallelMessageHandler = new ParallelQueueMessageHandler(messageHandler, maxParallelProcessing);
 
             _sender = new MessageSender(_sendConnection, numberOfMessages);
-            _receiver = new MessageReceiver(_receiveConnection, _changeHandler, numberOfMessages);
+            _receiver = new MessageReceiver(_receiveConnection, parallelMessageHandler, numberOfMessages);
 
             _stats = new PerformanceStats(_sender, new[] { _receiver });
         }

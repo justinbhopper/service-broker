@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,7 +8,7 @@ namespace ServiceBroker
     public class MessageReceiver : IQueueMessageHandler
     {
         private readonly IQueueMessageListener _messageListener;
-        private readonly IQueueMessageHandler _tableChangeHandler;
+        private readonly IQueueMessageHandler _messageHandler;
         private readonly CancellationTokenSource _tokenSource;
         private readonly int? _numberOfMessages;
 
@@ -21,22 +20,22 @@ namespace ServiceBroker
         public MessageReceiver(SqlConnection sqlConnection, int numberOfMessages)
             : this(sqlConnection, null, numberOfMessages) { }
 
-        public MessageReceiver(SqlConnection sqlConnection, ITableChangeHandler changeHandler)
-            : this(sqlConnection, changeHandler, null) { }
+        public MessageReceiver(SqlConnection sqlConnection, IQueueMessageHandler messageHandler)
+            : this(sqlConnection, messageHandler, null) { }
 
-        public MessageReceiver(SqlConnection sqlConnection, ITableChangeHandler changeHandler, int numberOfMessages)
-            : this(sqlConnection, changeHandler, (int?)numberOfMessages) { }
+        public MessageReceiver(SqlConnection sqlConnection, IQueueMessageHandler messageHandler, int numberOfMessages)
+            : this(sqlConnection, messageHandler, (int?)numberOfMessages) { }
 
-        private MessageReceiver(SqlConnection sqlConnection, ITableChangeHandler changeHandler, int? numberOfMessages)
+        private MessageReceiver(SqlConnection sqlConnection, IQueueMessageHandler messageHandler, int? numberOfMessages)
         {
             _numberOfMessages = numberOfMessages;
             _tokenSource = new CancellationTokenSource();
 
-            _tableChangeHandler = changeHandler != null ? new TableChangeQueueMessageHandler(changeHandler) : null;
+            _messageHandler = messageHandler;
             _messageListener = new QueueMessageListener(sqlConnection, this);
         }
 
-        public event EventHandler MessagesReceived;
+        public event EventHandler MessageReceived;
         public event EventHandler Finished;
 
         public int Received { get { return _messageCount; } }
@@ -58,14 +57,14 @@ namespace ServiceBroker
             OnFinished();
         }
 
-        async Task IQueueMessageHandler.HandleAsync(IEnumerable<Message> messages)
+        async Task IQueueMessageHandler.HandleAsync(Message message)
         {
             int count = Interlocked.Increment(ref _messageCount);
 
-            if (_tableChangeHandler != null)
-                await _tableChangeHandler.HandleAsync(messages);
+            if (_messageHandler != null)
+                await _messageHandler.HandleAsync(message);
 
-            MessagesReceived?.Invoke(this, EventArgs.Empty);
+            MessageReceived?.Invoke(this, EventArgs.Empty);
 
             if (_numberOfMessages.HasValue && count >= _numberOfMessages.Value)
             {

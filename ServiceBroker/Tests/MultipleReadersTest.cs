@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace ServiceBroker
 {
-    public class MultipleReadersTest : IDisposable, ITableChangeHandler
+    public class MultipleReadersTest : IDisposable, IQueueMessageHandler
     {
         private readonly IList<MessageReceiver> _receivers = new List<MessageReceiver>();
         private readonly MessageSender _sender;
@@ -71,7 +71,7 @@ namespace ServiceBroker
             }
         }
 
-        Task ITableChangeHandler.HandleAsync(IEnumerable<TableChange> tableChanges)
+        Task IQueueMessageHandler.HandleAsync(Message message)
         {
             _checkIfFinished();
             return Task.CompletedTask;

@@ -15,7 +15,7 @@ namespace ServiceBroker
 
             foreach (var receiver in receivers)
             {
-                receiver.MessagesReceived += (s, e) => OnStatsChanged();
+                receiver.MessageReceived += (s, e) => OnStatsChanged();
             }
         }
 
