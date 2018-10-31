@@ -10,13 +10,13 @@ namespace ServiceBroker
         public Task InsertOrUpdateAsync(ICollection<int> insertedOrUpdated)
         {
             Processed++;
-            return Task.CompletedTask;
+            return Task.Delay(500);
         }
 
         public Task DeleteAsync(ICollection<int> deleted)
         {
             Processed++;
-            return Task.CompletedTask;
+            return Task.Delay(500);
         }
     }
 }

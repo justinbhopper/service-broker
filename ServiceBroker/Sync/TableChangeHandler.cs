@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace ServiceBroker
 {
@@ -11,7 +12,15 @@ namespace ServiceBroker
             _synchronizerMapper = synchronizerMapper;
         }
 
-        public async Task HandleAsync(TableChange tableChange)
+        public async Task HandleAsync(IEnumerable<TableChange> tableChanges)
+        {
+            foreach (var change in tableChanges)
+            {
+                await HandleAsync(change);
+            }
+        }
+
+        private async Task HandleAsync(TableChange tableChange)
         {
             var synchronizer = _synchronizerMapper.GetSynchronizer(tableChange.TableName);
 

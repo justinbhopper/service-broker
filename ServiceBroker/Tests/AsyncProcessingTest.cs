@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Data.SqlClient;
-using System.Threading.Tasks;
 
 namespace ServiceBroker
 {
@@ -22,13 +21,12 @@ namespace ServiceBroker
 
             _preTest = new PreTest(_sendConnection);
 
+            _changeHandler = new TableChangeHandler(new MockSynchronizerMapper(_synchronizer));
+
             _sender = new MessageSender(_sendConnection, numberOfMessages);
-            _receiver = new MessageReceiver(_receiveConnection, numberOfMessages);
-            _receiver.TablesChanged += OnTablesChanged;
+            _receiver = new MessageReceiver(_receiveConnection, _changeHandler, numberOfMessages);
 
             _stats = new PerformanceStats(_sender, new[] { _receiver });
-
-            _changeHandler = new TableChangeHandler(new MockSynchronizerMapper(_synchronizer));
         }
 
         public event EventHandler<string> UpdateStatistics;
@@ -48,20 +46,6 @@ namespace ServiceBroker
         {
             _receiveConnection.Dispose();
             _sendConnection.Dispose();
-        }
-
-        // Important: Block event handler during processing by waiting on the task to finish in the handler
-        private void OnTablesChanged(object sender, TablesChangedEventArgs e)
-        {
-            Task.Run(async () => await OnTablesChangedAsync(sender, e)).Wait();
-        }
-
-        private async Task OnTablesChangedAsync(object sender, TablesChangedEventArgs e)
-        {
-            foreach (var change in e.Changes)
-            {
-                await _changeHandler.HandleAsync(change);
-            }
         }
 
         private void OnSendingFinished()

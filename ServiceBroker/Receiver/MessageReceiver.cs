@@ -1,31 +1,42 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace ServiceBroker
 {
-    public class MessageReceiver
+    public class MessageReceiver : IQueueMessageHandler
     {
-        private readonly ITableChangeListener _tableChangeListener;
+        private readonly IQueueMessageListener _messageListener;
+        private readonly IQueueMessageHandler _tableChangeHandler;
         private readonly CancellationTokenSource _tokenSource;
         private readonly int? _numberOfMessages;
 
         private int _messageCount;
 
-        public MessageReceiver(SqlConnection sqlConnection, int? numberOfMessages)
+        public MessageReceiver(SqlConnection sqlConnection)
+            : this(sqlConnection, null, null) { }
+
+        public MessageReceiver(SqlConnection sqlConnection, int numberOfMessages)
+            : this(sqlConnection, null, numberOfMessages) { }
+
+        public MessageReceiver(SqlConnection sqlConnection, ITableChangeHandler changeHandler)
+            : this(sqlConnection, changeHandler, null) { }
+
+        public MessageReceiver(SqlConnection sqlConnection, ITableChangeHandler changeHandler, int numberOfMessages)
+            : this(sqlConnection, changeHandler, (int?)numberOfMessages) { }
+
+        private MessageReceiver(SqlConnection sqlConnection, ITableChangeHandler changeHandler, int? numberOfMessages)
         {
             _numberOfMessages = numberOfMessages;
-            
-            var messageListener = new QueueMessageListener(sqlConnection);
-            messageListener.MessagesReceived += OnMessagesReceived;
-
-            _tableChangeListener = new TableChangeListener(messageListener);
-            _tableChangeListener.TablesChanged += OnTablesChanged;
-
             _tokenSource = new CancellationTokenSource();
+
+            _tableChangeHandler = changeHandler != null ? new TableChangeQueueMessageHandler(changeHandler) : null;
+            _messageListener = new QueueMessageListener(sqlConnection, this);
         }
 
-        public event EventHandler<TablesChangedEventArgs> TablesChanged;
+        public event EventHandler MessagesReceived;
         public event EventHandler Finished;
 
         public int Received { get { return _messageCount; } }
@@ -38,12 +49,7 @@ namespace ServiceBroker
             OnStart();
             
             cancellation.Register(SignalStop);
-            _tableChangeListener.Listen(_tokenSource.Token);
-        }
-
-        private void OnTablesChanged(object sender, TablesChangedEventArgs e)
-        {
-            TablesChanged?.Invoke(sender, e);
+            _messageListener.Listen(_tokenSource.Token);
         }
 
         private void SignalStop()
@@ -52,9 +58,14 @@ namespace ServiceBroker
             OnFinished();
         }
 
-        private void OnMessagesReceived(object sender, MessagesReceivedEventArgs e)
+        async Task IQueueMessageHandler.HandleAsync(IEnumerable<Message> messages)
         {
             int count = Interlocked.Increment(ref _messageCount);
+
+            if (_tableChangeHandler != null)
+                await _tableChangeHandler.HandleAsync(messages);
+
+            MessagesReceived?.Invoke(this, EventArgs.Empty);
 
             if (_numberOfMessages.HasValue && count >= _numberOfMessages.Value)
             {

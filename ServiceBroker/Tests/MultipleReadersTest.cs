@@ -3,35 +3,40 @@ using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace ServiceBroker
 {
-    public class MultipleReadersTest : IDisposable
+    public class MultipleReadersTest : IDisposable, ITableChangeHandler
     {
-        private readonly IList<MessageReceiver> _receivers;
+        private readonly IList<MessageReceiver> _receivers = new List<MessageReceiver>();
         private readonly MessageSender _sender;
         private readonly PerformanceStats _stats;
-        private readonly IList<SqlConnection> _receiveConnections;
+        private readonly IList<SqlConnection> _receiveConnections = new List<SqlConnection>();
         private readonly SqlConnection _sendConnection;
         private readonly PreTest _preTest;
         private readonly CancellationTokenSource _token = new CancellationTokenSource();
         private readonly int _numberOfMessages;
-        private Action _checkIfFinished;
+        private readonly Action _checkIfFinished;
 
         public MultipleReadersTest(string sendConnectionString, string receiveConnectionString, int numberOfReaders, int numberOfMessages)
         {
             _sendConnection = new SqlConnection(sendConnectionString);
-            _receiveConnections = new List<SqlConnection>();
             _numberOfMessages = numberOfMessages;
+            _checkIfFinished = new Action(() => CheckIfFinished()).Debounce(TimeSpan.FromMilliseconds(500));
 
             for (int i = 0; i < numberOfReaders; ++i)
             {
-                _receiveConnections.Add(new SqlConnection(receiveConnectionString));
+                var ids = new HashSet<int>();
+                var connection = new SqlConnection(receiveConnectionString);
+                var receiver = new MessageReceiver(connection, this);
+                
+                _receivers.Add(receiver);
+                _receiveConnections.Add(connection);
             }
-
+            
             _preTest = new PreTest(_sendConnection);
             _sender = new MessageSender(_sendConnection, numberOfMessages);
-            _receivers = _receiveConnections.Select(c => new MessageReceiver(c, null)).ToList();
             _stats = new PerformanceStats(_sender, _receivers);
         }
 
@@ -60,13 +65,16 @@ namespace ServiceBroker
 
         private void OnSendingFinished()
         {
-            _checkIfFinished = new Action(() => CheckIfFinished()).Debounce(TimeSpan.FromMilliseconds(500));
-
             foreach (var receiver in _receivers)
             {
-                receiver.TablesChanged += (s, e) => _checkIfFinished();
                 receiver.Listen(_token.Token);
             }
+        }
+
+        Task ITableChangeHandler.HandleAsync(IEnumerable<TableChange> tableChanges)
+        {
+            _checkIfFinished();
+            return Task.CompletedTask;
         }
 
         private void CheckIfFinished()

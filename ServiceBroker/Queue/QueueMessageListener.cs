@@ -3,6 +3,7 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Dapper;
 
 namespace ServiceBroker
@@ -10,46 +11,45 @@ namespace ServiceBroker
     public class QueueMessageListener : IQueueMessageListener
     {
         private readonly SqlConnection _sqlConnection;
+        private readonly IQueueMessageHandler _messageHandler;
         private readonly CommandDefinition _command;
 
-        public QueueMessageListener(SqlConnection sqlConnection)
+        public QueueMessageListener(SqlConnection sqlConnection, IQueueMessageHandler messageHandler)
         {
             _sqlConnection = sqlConnection;
+            _messageHandler = messageHandler;
             _command = new CommandDefinition("dbo.spx_ReceiveSyncRequest", new { timeoutMs = 100 }, commandTimeout: 2, commandType: CommandType.StoredProcedure);
         }
-
-        public event EventHandler<MessagesReceivedEventArgs> MessagesReceived;
-
+        
         public void Listen(CancellationToken cancellationToken = default(CancellationToken))
         {
-            var thread = new Thread(() => LoopUntil(cancellationToken)) { IsBackground = true };
-            thread.Start();
+            Task.Factory.StartNew(async () => await LoopUntilAsync(cancellationToken), TaskCreationOptions.LongRunning);
         }
         
-        private void LoopUntil(CancellationToken cancellation)
+        private async Task LoopUntilAsync(CancellationToken cancellation)
         {
             while (!cancellation.IsCancellationRequested)
             {
-                CheckForMessages();
+                await CheckForMessagesAsync();
             }
         }
 
-        private void CheckForMessages()
+        private async Task CheckForMessagesAsync()
         {
             try
             {
-                var messages = _sqlConnection.Query<Message>(_command);
+                var messages = await _sqlConnection.QueryAsync<Message>(_command);
 
                 int count = messages.Count();
 
                 if (count > 0)
                 {
-                    MessagesReceived?.Invoke(this, new MessagesReceivedEventArgs(messages));
+                    await _messageHandler.HandleAsync(messages);
                 }
             }
             catch (Exception e)
             {
-                // TODO: add an event here
+                // TODO: add handleerror to IQueueMessageHandler
             }
         }
     }

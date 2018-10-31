@@ -3,37 +3,45 @@ using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace ServiceBroker
 {
     public class ConcurrencyProblemTest : IDisposable
     {
-        private readonly IList<MessageReceiver> _receivers;
+        private readonly IList<MessageReceiver> _receivers = new List<MessageReceiver>();
         private readonly MessageSender _sender;
         private readonly PerformanceStats _stats;
-        private readonly IList<SqlConnection> _receiveConnections;
+        private readonly IList<SqlConnection> _receiveConnections = new List<SqlConnection>();
         private readonly SqlConnection _sendConnection;
         private readonly PreTest _preTest;
         private readonly IList<ISet<int>> _clientIds = new List<ISet<int>>();
         private readonly CancellationTokenSource _token = new CancellationTokenSource();
         private readonly int _numberOfMessages;
-        private Action _checkIfFinished;
+        private readonly Action _checkIfFinished;
 
         public ConcurrencyProblemTest(string sendConnectionString, string receiveConnectionString, int numberOfReaders, int numberOfMessages)
         {
             _sendConnection = new SqlConnection(sendConnectionString);
-            _receiveConnections = new List<SqlConnection>();
             _numberOfMessages = numberOfMessages;
+            _checkIfFinished = new Action(() => CheckIfFinished()).Debounce(TimeSpan.FromMilliseconds(500));
 
             for (int i = 0; i < numberOfReaders; ++i)
             {
-                _clientIds.Add(new HashSet<int>());
-                _receiveConnections.Add(new SqlConnection(receiveConnectionString));
+                var ids = new HashSet<int>();
+                var connection = new SqlConnection(receiveConnectionString);
+                var collector = new TableChangeIdCollector(ids);
+                var receiver = new MessageReceiver(connection, collector);
+
+                collector.TableChanged += (s, e) => _checkIfFinished();
+
+                _receivers.Add(receiver);
+                _clientIds.Add(ids);
+                _receiveConnections.Add(connection);
             }
 
             _preTest = new PreTest(_sendConnection);
             _sender = new MessageSender(_sendConnection, numberOfMessages);
-            _receivers = _receiveConnections.Select(c => new MessageReceiver(c, null)).ToList();
             _stats = new PerformanceStats(_sender, _receivers);
         }
 
@@ -62,34 +70,13 @@ namespace ServiceBroker
 
         private void OnSendingFinished()
         {
-            _checkIfFinished = new Action(() => CheckIfFinished()).Debounce(TimeSpan.FromMilliseconds(500));
-
             for (int i = 0; i < _receivers.Count; i++)
             {
-                var receiver = _receivers[i];
                 _clientIds[i].Clear();
-
-                int localIndex = i;
-                receiver.TablesChanged += (s, e) => OnTablesChanged(localIndex, e);
-                receiver.TablesChanged += (s, e) => _checkIfFinished();
-                receiver.Listen(_token.Token);
+                _receivers[i].Listen(_token.Token);
             }
         }
-
-        private void OnTablesChanged(int index, TablesChangedEventArgs e)
-        {
-            if (e.Changes == null)
-                return;
-
-            foreach (var tableChange in e.Changes)
-            {
-                foreach (int id in tableChange.InsertedOrUpdated)
-                {
-                    _clientIds[index].Add(id);
-                }
-            }
-        }
-
+        
         private void CheckIfFinished()
         {
             if (_receivers.Sum(r => r.Received) < _numberOfMessages)
@@ -127,6 +114,36 @@ namespace ServiceBroker
         private void OnUpdateStatistics(object sender, string stats)
         {
             UpdateStatistics?.Invoke(this, stats);
+        }
+
+        private class TableChangeIdCollector : ITableChangeHandler
+        {
+            private readonly ISet<int> _ids;
+
+            public TableChangeIdCollector(ISet<int> ids)
+            {
+                _ids = ids;
+            }
+
+            public event EventHandler TableChanged;
+
+            Task ITableChangeHandler.HandleAsync(IEnumerable<TableChange> tableChanges)
+            {
+                foreach (var tableChange in tableChanges)
+                {
+                    if (tableChange.InsertedOrUpdated == null)
+                        continue;
+                    
+                    foreach (int id in tableChange.InsertedOrUpdated)
+                    {
+                        _ids.Add(id);
+                    }
+                }
+
+                TableChanged?.Invoke(this, EventArgs.Empty);
+
+                return Task.CompletedTask;
+            }
         }
     }
 }
