@@ -1,3 +1,9 @@
+use master;
+
+if exists (select * from sys.databases where name = 'SbTest')
+	drop database SbTest;
+go
+
 create database SbTest;
 go
 
@@ -12,6 +18,8 @@ use SbTest;
 create table Client (
 	ClientId int not null identity,
 	ClientKey uniqueidentifier not null,
+	FirstName varchar(50) not null,
+	LastName varchar(50) not null,
 	constraint PK_Client primary key (ClientId)
 )
 go
@@ -72,11 +80,14 @@ begin
 			SyncQueue_receive
 	), timeout @timeoutMs;
 
-	end conversation @handle;
-
-	select 
-		@handle as ConversationHandle, 
-		@body as Body
+	if (@handle is not null)
+	begin
+		end conversation @handle;
+		
+		select 
+			@handle as ConversationHandle, 
+			@body as Body
+	end
 
 	commit tran
 end
@@ -131,14 +142,50 @@ end
 go
 
 create or alter procedure spx_InsertClient
-	@clientKey uniqueidentifier
+	@clientKey uniqueidentifier,
+	@firstName varchar(50),
+	@lastName varchar(50)
 as
 begin
-	insert into Client (ClientKey) values (@clientKey)
+	insert into Client (ClientKey, FirstName, LastName) values (@clientKey, @firstName, @lastName)
 end
 go
 
-create or alter trigger trg_Client_ForInsertUpdate on Client for insert, update, delete
+create or alter procedure spx_UpdateClient
+	@clientId int,
+	@firstName varchar(50)
+as
+begin
+	update Client set FirstName = @firstName where ClientId = @clientId
+end
+go
+
+create or alter procedure spx_DeleteClient
+	@clientId int
+as
+begin
+	delete from Client where ClientId = @clientId
+end
+go
+
+create or alter trigger trg_Client_ForInsertUpdate on Client for update
+as
+	declare @request nvarchar(max) = (
+		select
+		'Client' as 'TableName',
+		COLUMNS_UPDATED() as 'UpdatedColumns',
+		(
+			select ClientId as 'Id'
+			from inserted 
+			for json path
+		) as Updated
+		for json path
+	)
+
+	exec spx_SendSyncRequest @request
+go
+
+create or alter trigger trg_Client_ForInsertDelete on Client for insert, delete
 as
 	declare @request nvarchar(max) = (
 		select
@@ -147,7 +194,7 @@ as
 			select ClientId as 'Id'
 			from inserted 
 			for json path
-		) as InsertedOrUpdated,
+		) as Inserted,
 		(
 			select ClientId as 'Id'
 			from deleted 
@@ -159,6 +206,10 @@ as
 	exec spx_SendSyncRequest @request
 go
 
+if exists (select loginname from master.sys.syslogins where name = 'SbUser')
+	drop login SbUser
+go
+
 create login SbUser with password = 'SbUser', check_policy = off, check_expiration = off
 go
 
@@ -167,3 +218,5 @@ go
 
 exec sp_addrolemember 'db_owner', 'SbUser'
 go
+
+use master;

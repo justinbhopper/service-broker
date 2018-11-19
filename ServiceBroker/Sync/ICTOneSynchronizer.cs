@@ -5,7 +5,8 @@ namespace ServiceBroker
 {
     public interface ICTOneSynchronizer
     {
-        Task InsertOrUpdateAsync(ICollection<int> insertedOrUpdated);
+        Task InsertAsync(ICollection<int> inserted);
+        Task UpdateAsync(ICollection<int> updated);
         Task DeleteAsync(ICollection<int> deleted);
     }
 }

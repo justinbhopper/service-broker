@@ -7,7 +7,13 @@ namespace ServiceBroker
     {
         public int Processed;
 
-        public Task InsertOrUpdateAsync(ICollection<int> insertedOrUpdated)
+        public Task InsertAsync(ICollection<int> inserted)
+        {
+            Processed++;
+            return Task.Delay(500);
+        }
+
+        public Task UpdateAsync(ICollection<int> updated)
         {
             Processed++;
             return Task.Delay(500);

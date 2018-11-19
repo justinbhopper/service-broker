@@ -45,7 +45,7 @@ namespace ServiceBroker
                         new TableChangeMessage
                         {
                             TableName = "Test",
-                            InsertedOrUpdated = new List<TableChangeMessageItem>
+                            Inserted = new List<TableChangeMessageItem>
                             {
                                 new TableChangeMessageItem
                                 {
@@ -76,7 +76,7 @@ namespace ServiceBroker
                     
                     var request = _serializer.Deserialize(getResult.Body, Encoding.UTF8);
 
-                    if (request.First().InsertedOrUpdated.First() != 1)
+                    if (request.First().Inserted.First() != 1)
                         throw new Exception("Failed to read message from rabbitmq");
                 }
 

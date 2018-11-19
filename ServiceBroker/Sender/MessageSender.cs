@@ -49,7 +49,7 @@ namespace ServiceBroker
         {
             try
             {
-                var command = new CommandDefinition("dbo.spx_InsertClient", new { clientKey = Guid.NewGuid() }, commandType: CommandType.StoredProcedure);
+                var command = new CommandDefinition("dbo.spx_InsertClient", new { clientKey = Guid.NewGuid(), firstName = "Justin", lastName = "Hopper" }, commandType: CommandType.StoredProcedure);
                 
                 await _sqlConnection.ExecuteAsync(command);
                 MessageSent?.Invoke(this, EventArgs.Empty);

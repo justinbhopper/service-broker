@@ -35,7 +35,8 @@ namespace ServiceBroker
                 {
                     new TableChange(changeMessage.TableName)
                     {
-                        InsertedOrUpdated = changeMessage.InsertedOrUpdated?.Select(i => i.Id).ToList(),
+                        Inserted = changeMessage.Inserted?.Select(i => i.Id).ToList(),
+                        Updated = changeMessage.Updated?.Select(i => i.Id).ToList(),
                         Deleted = changeMessage.Deleted?.Select(i => i.Id).ToList()
                     }
                 };
@@ -45,7 +46,7 @@ namespace ServiceBroker
             var changes = new Dictionary<string, TableChange>();
             foreach (var changeMessage in changeMessages)
             {
-                if (changeMessage.InsertedOrUpdated == null && changeMessage.Deleted == null)
+                if (changeMessage.Inserted == null && changeMessage.Updated == null && changeMessage.Deleted == null)
                     continue;
 
                 string tableName = changeMessage.TableName;
@@ -61,8 +62,11 @@ namespace ServiceBroker
                     tableChange = changes[tableName];
                 }
 
-                if (changeMessage.InsertedOrUpdated != null)
-                    tableChange.InsertedOrUpdated.AddRange(changeMessage.InsertedOrUpdated.Select(i => i.Id));
+                if (changeMessage.Inserted != null)
+                    tableChange.Inserted.AddRange(changeMessage.Inserted.Select(i => i.Id));
+
+                if (changeMessage.Updated != null)
+                    tableChange.Updated.AddRange(changeMessage.Updated.Select(i => i.Id));
 
                 if (changeMessage.Deleted != null)
                     tableChange.Deleted.AddRange(changeMessage.Deleted.Select(i => i.Id));

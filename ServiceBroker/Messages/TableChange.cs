@@ -4,7 +4,8 @@ namespace ServiceBroker
 {
     public class TableChange
     {
-        private List<int> _insertedOrUpdated;
+        private List<int> _inserted;
+        private List<int> _updated;
         private List<int> _deleted;
 
         public TableChange(string tableName)
@@ -12,12 +13,18 @@ namespace ServiceBroker
             TableName = tableName;
         }
 
-        public string TableName { get; set; }
+        public string TableName { get; }
 
-        public List<int> InsertedOrUpdated
+        public List<int> Inserted
         {
-            get => _insertedOrUpdated ?? (_insertedOrUpdated = new List<int>());
-            set => _insertedOrUpdated = value;
+            get => _inserted ?? (_inserted = new List<int>());
+            set => _inserted = value;
+        }
+
+        public List<int> Updated
+        {
+            get => _updated ?? (_updated = new List<int>());
+            set => _updated = value;
         }
 
         public List<int> Deleted

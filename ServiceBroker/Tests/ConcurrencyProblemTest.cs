@@ -132,12 +132,20 @@ namespace ServiceBroker
             {
                 foreach (var tableChange in tableChanges)
                 {
-                    if (tableChange.InsertedOrUpdated == null)
-                        continue;
-                    
-                    foreach (int id in tableChange.InsertedOrUpdated)
+                    if (tableChange.Inserted != null)
                     {
-                        _ids.Add(id);
+                        foreach (int id in tableChange.Inserted)
+                        {
+                            _ids.Add(id);
+                        }
+                    }
+
+                    if (tableChange.Updated != null)
+                    {
+                        foreach (int id in tableChange.Updated)
+                        {
+                            _ids.Add(id);
+                        }
                     }
                 }
 

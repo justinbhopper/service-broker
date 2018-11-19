@@ -24,8 +24,11 @@ namespace ServiceBroker
         {
             var synchronizer = _synchronizerMapper.GetSynchronizer(tableChange.TableName);
 
-            if (tableChange.InsertedOrUpdated?.Count > 0)
-                await synchronizer.InsertOrUpdateAsync(tableChange.InsertedOrUpdated);
+            if (tableChange.Inserted?.Count > 0)
+                await synchronizer.InsertAsync(tableChange.Inserted);
+
+            if (tableChange.Updated?.Count > 0)
+                await synchronizer.InsertAsync(tableChange.Updated);
 
             if (tableChange.Deleted?.Count > 0)
                 await synchronizer.DeleteAsync(tableChange.Deleted);
